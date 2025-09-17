@@ -1,4 +1,3 @@
-  // ModelViewerWithControls.jsx
   import React, { Suspense, useRef, useEffect, useState } from "react";
   import { Canvas, useFrame } from "@react-three/fiber";
   import { OrbitControls } from "@react-three/drei";
@@ -7,10 +6,10 @@
   import * as THREE from "three";
   import io from "socket.io-client";
 
-  // ---------------------- Socket.IO ----------------------
+  //  Socket.IO 
   const socket = io("http://localhost:5000");
 
-  // ---------------------- VRMModel Component ----------------------
+  //  VRMModel Component 
   function VRMModel({ url, controls }) {
     const group = useRef();
     const vrmRef = useRef(null);
@@ -21,7 +20,7 @@
 
     const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 
-    // ------------------- Load VRM -------------------
+    // Load VRM 
     useEffect(() => {
       const loader = new GLTFLoader();
       loader.register((parser) => new VRMLoaderPlugin(parser));
@@ -77,7 +76,7 @@
       return () => (mounted = false);
     }, [url]);
 
-    // ------------------- Helpers -------------------
+    // - Helpers 
     const setBlend = (name, val) => {
       const arr = blendMapRef.current[name];
       if (!arr) return;
@@ -91,7 +90,7 @@
       bone.quaternion.slerp(new THREE.Quaternion().setFromEuler(target), smooth);
     };
 
-    // ------------------- Animation Loop -------------------
+    // Animation Loop 
     const blinkCurrent = useRef(0);
     const headIdle = useRef({ x: 0, y: 0 });
     const lerp = (a, b, t) => a + (b - a) * t;
@@ -163,7 +162,7 @@
     const [controls, setControls] = useState(initialControls);
     const [ttsText, setTtsText] = useState("");
 
-    // ------------------- Socket Two-Way -------------------
+    //  Socket Two-Way 
     useEffect(() => {
       socket.on("update_controls", (data) => setControls((prev) => ({ ...prev, ...data })));
     }, []);
