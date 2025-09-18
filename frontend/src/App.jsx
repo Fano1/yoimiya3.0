@@ -2,6 +2,7 @@ import ModelViewer from "./components/Exp";
 import WaifuModel from './components/Waifu'
 import VRMDebug from './components/Component'
 import React, { useState } from "react";
+import ChatInterface from "./components/Chatinterface";
 
 export default function App() {
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -13,6 +14,7 @@ export default function App() {
     {/* </div> */}
 
         <div style={{zIndex: -1, width: '100vw', height: '100vh'}}><WaifuModel /></div>
+        {/* <ChatInterface /> */}
       </>
   )
 }
