@@ -34,7 +34,7 @@ def compute_visemes(text):
         visemes.append({"mouth": {v: 1} if v else {}})
     return visemes
 
-# ---------------- TTS ----------------
+# TS 
 def generate_tts_file(text):
     """Generate MP3 using Edge TTS and return filename"""
     tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")

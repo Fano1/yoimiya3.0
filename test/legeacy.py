@@ -75,7 +75,7 @@ def on_connect():
 
 @socketio.on("disconnect")
 def on_disconnect():
-    print("[Socket.IO] Client disconnected")
+    print("[Socket.IO] Client disconnecteds")
 
 @socketio.on("hello_world")
 def on_hello_world(data):
