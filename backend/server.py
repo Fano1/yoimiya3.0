@@ -6,18 +6,19 @@ import asyncio
 from flask import Flask, send_file, request
 from flask_socketio import SocketIO
 import edge_tts
-# backend.py
 from flask_cors import CORS
-from random import random
 
+from simple import init, aiMsg  # LLM wrapper
+from protocol import secrete
 
-# Flask + SocketIO
+#    Flask + SocketIO   
 app = Flask(__name__)
-CORS(app)  # add this after Flask app creation
-app.config["SECRET_KEY"] = "secret!"
+toolBind = init()
+CORS(app)
+app.config["SECRET_KEY"] = secrete
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
-# viseme Mapping
+#    Viseme mapping   
 def char_to_viseme(c):
     c = c.lower()
     if c in "aáàâä": return "A"
@@ -27,51 +28,29 @@ def char_to_viseme(c):
     if c in "oóòôö": return "O"
     return None
 
-def compute_visemes(text):
+def compute_visemes(text, char_time=0.09):
     visemes = []
+    current_time = 0
     for char in text:
         v = char_to_viseme(char)
-        visemes.append({"mouth": {v: 1} if v else {}})
+        visemes.append({"time": current_time, "mouth": {v: 1} if v else {}})
+        current_time += char_time
     return visemes
 
-# TS 
-def generate_tts_file(text):
+#    TTS   
+def generate_tts_file(text, voice="en-US-AriaNeural"):
     """Generate MP3 using Edge TTS and return filename"""
     tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
     tmp_file.close()
 
     async def gen():
-        communicate = edge_tts.Communicate(text, voice="en-US-JennyNeural")
+        communicate = edge_tts.Communicate(text, voice=voice)
         await communicate.save(tmp_file.name)
 
     asyncio.run(gen())
     return tmp_file.name
 
-@app.route("/tts", methods=["GET"])
-def tts():
-    rawText = request.args.get("text", "").strip()
-    if not rawText:
-        return "No text provided", 400
-
-    # Cerate temp file
-    tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
-    tmp_file.close()
-
-    llmText = f"Here is a random number: {random()}.\nAlso, the text you provided is: {rawText}"
-
-    async def gen():
-        communicate = edge_tts.Communicate(llmText, voice="en-US-AriaNeural")
-        await communicate.save(tmp_file.name)
-
-    # run async TTS syncronously
-    asyncio.run(gen())
-
-    # Send the file (do not delete immediately, Windows will fucking lock it)
-    response = send_file(tmp_file.name, mimetype="audio/mpeg")
-    return response
-
-
-#  SocketIO
+#    SocketIO   
 @socketio.on("connect")
 def on_connect():
     print("[Socket.IO] Client connected")
@@ -82,26 +61,27 @@ def on_disconnect():
 
 @socketio.on("hello_world")
 def on_hello_world(data):
-    text = data.get("text", "").strip()
-    if not text:
+    rawtext = data.get("text", "").strip()
+    if not rawtext:
         return
 
-    #Generate visemes sequence
-    viseme_sequence = compute_visemes(text)
+    llm_output = aiMsg(toolBind, rawtext)
+    print(f"[Socket.IO] LLM OUTPUT: {llm_output}")
+    viseme_sequence = compute_visemes(llm_output)
+    tmp_file = generate_tts_file(llm_output)
+    socketio.emit("play_audio", {
+        "audio_url": f"/audio/{os.path.basename(tmp_file)}",
+        "visemes": viseme_sequence
+    })
 
-    #Generate audio file
-    tmp_file = generate_tts_file(text)
+# Serve generated audio 
+@app.route("/audio/<filename>")
+def serve_audio(filename):
+    path = os.path.join(tempfile.gettempdir(), filename)
+    if not os.path.exists(path):
+        return "File not found", 404
+    return send_file(path, mimetype="audio/mpeg")
 
-    #Notify frontend to play audio and start visemes
-    socketio.emit("play_audio", {"audio_url": f"/tts?file={os.path.basename(tmp_file)}", "visemes": viseme_sequence})
-
-
-    print(f"[Socket.IO] SPEAK: {text}")
-    viseme_sequence = compute_visemes(text)
-    for vis in viseme_sequence:
-        socketio.emit("update_controls", vis)
-        time.sleep(0.2)  # 50ms per char
-
-# Run Server
+# Run server 
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=5000)

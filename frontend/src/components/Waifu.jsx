@@ -169,6 +169,38 @@ export default function ModelViewerWithControls() {
     return () => socket.off("update_controls", handler);
   }, []);
 
+  useEffect(() => {
+  let visemeTimeouts = [];
+
+  const handler = ({ audio_url, visemes }) => {
+    const audio = new Audio(`http://localhost:5000${audio_url}`);
+    audio.play().catch(err => console.warn("Audio not ready yet:", err));
+
+    // Schedule visemes
+    visemes.forEach(v => {
+      const t = setTimeout(() => {
+        setControls(prev => ({ ...prev, mouth: { ...v.mouth } }));
+      }, v.time * 1000);
+      visemeTimeouts.push(t);
+    });
+
+    // Reset mouth after audio ends and clear pending timeouts
+    audio.onended = () => {
+      visemeTimeouts.forEach(t => clearTimeout(t));
+      visemeTimeouts = [];
+      setControls(prev => ({ ...prev, mouth: { A:0, I:0, U:0, E:0, O:0 } }));
+    };
+  };
+
+  socket.on("play_audio", handler);
+
+  return () => {
+    socket.off("play_audio", handler);
+    visemeTimeouts.forEach(t => clearTimeout(t));
+  };
+}, []);
+
+
   const updateControls = (newControls) => {
     setControls(newControls);
     socket.emit("controls_update", newControls);
@@ -182,25 +214,10 @@ export default function ModelViewerWithControls() {
     </div>
   );
 
-    const triggerHelloWorld = () => {
+  const triggerHelloWorld = () => {
       if (!ttsText.trim()) return;
     
-      // Create audio
-      const audio = new Audio(`http://localhost:5000/tts?text=${encodeURIComponent(ttsText)}`);
-    
-      // Try to play immediately
-      audio.play().catch(err => console.warn("Audio not ready yet:", err));
-    
-      // Start sending visemes immediately, synced with audio start
-      audio.onplay = () => {
-        socket.emit("hello_world", { text: ttsText });
-      };
-    
-      // Optional: stop visemes when audio ends
-      audio.onended = () => {
-        socket.emit("update_controls", { mouth: { A:0, I:0, U:0, E:0, O:0 } });
-      };
-    
+      socket.emit("hello_world", { text: ttsText });
       setTtsText("");
     };
 
