@@ -22,7 +22,7 @@ export default function ChatInterface() {
   const sendMessage = () => {
     if (!input.trim()) return;
     setMessages((prev) => [...prev, { type: "user", text: input }]);
-    socket.emit("chat_message", { text: input });
+    socket.emit("hello_world", { text: input });
     setInput("");
   };
 

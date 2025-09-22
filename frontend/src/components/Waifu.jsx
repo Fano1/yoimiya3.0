@@ -91,11 +91,14 @@ function VRMModel({ url, controls }) {
   const blinkCurrent = useRef(0);
   const headIdle = useRef({ x: 0, y: 0 });
   const lerp = (a, b, t) => a + (b - a) * t;
+  const blinkTimer = useRef({ last: Date.now(), interval: 3000, closing: false });
 
   useFrame(() => {
     if (!vrmRef.current) return;
     const s = controls;
     const r = resolved.current;
+    const now = Date.now();
+    
 
     // Bones
     setRotation("head", s.headX, s.headY, s.headZ);
@@ -106,9 +109,41 @@ function VRMModel({ url, controls }) {
     setRotation("rightUpperLeg", s.rightLegX, s.rightLegY, s.rightLegZ);
 
     // Blink
-    const blinkTarget = s.blinkToggle ? s.blinkIntensity : 0;
-    blinkCurrent.current = lerp(blinkCurrent.current, blinkTarget, 0.35);
+    let blinkTarget = 0;
+
+
+    // --- Blink System ---
+    if (!blinkTimer.current) {
+      blinkTimer.current = { last: Date.now(), interval: 3000, closing: false };
+    }
+
+    const elapsed = now - blinkTimer.current.last;
+
+    if (!s.blinkToggle) {
+      // Auto blink mode
+      if (elapsed > blinkTimer.current.interval) {
+        blinkTimer.current.closing = true;
+        blinkTimer.current.last = now;
+
+        // Randomize next blink (2–6 sec feels natural)
+        blinkTimer.current.interval = 2000 + Math.random() * 4000;
+      }
+    }
+
+    if (s.blinkToggle) {
+      // Manual blink mode
+      blinkTarget = s.blinkIntensity;
+    } else if (blinkTimer.current.closing) {
+      blinkTarget = 1.0; // eyes closed
+      if (elapsed > 150) {
+        blinkTimer.current.closing = false; // reopen after 150ms
+      }
+    }
+
+    // Smooth interpolation
+    blinkCurrent.current = lerp(blinkCurrent.current, blinkTarget, 0.25);
     r.blink.forEach((name) => setBlend(name, blinkCurrent.current));
+
 
     // Emotions / brows / all
     Object.keys(r.all).forEach((name) => {
@@ -131,7 +166,6 @@ function VRMModel({ url, controls }) {
     });
 
     // Idle sway
-    const now = Date.now();
     headIdle.current.x = lerp(headIdle.current.x, Math.sin(now * 0.001) * 0.03, 0.05);
     headIdle.current.y = lerp(headIdle.current.y, Math.sin(now * 0.0015) * 0.05, 0.05);
     group.current.rotation.x = headIdle.current.x;
@@ -148,11 +182,11 @@ export default function ModelViewerWithControls() {
   const initialControls = {
     headX: 0, headY: 0, headZ: 0,
     spineX: 0, spineY: 0, spineZ: 0,
-    leftArmX: 0, leftArmY: 0, leftArmZ: 0,
-    rightArmX: 0, rightArmY: 0, rightArmZ: 0,
+    leftArmX: 0, leftArmY: 0, leftArmZ: -1,
+    rightArmX: 0, rightArmY: 0, rightArmZ: 1,
     leftLegX: 0, leftLegY: 0, leftLegZ: 0,
     rightLegX: 0, rightLegY: 0, rightLegZ: 0,
-    blinkToggle: true,
+    blinkToggle: false,
     blinkIntensity: 0.8,
     emotionIntensity: 0.8,
     emotions: { angry: false, fun: false, joy: false, sorrow: false, surprised: false },
