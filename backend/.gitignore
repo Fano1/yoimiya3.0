@@ -1,1 +1,7 @@
 protocol.py
+.env
+.python-version
+__pycache__
+memory.db
+memory.db-wal
+memory.db-shm
